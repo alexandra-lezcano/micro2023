@@ -1,15 +1,16 @@
 .model small
 .stack 100h
 .data
-invader1 db "M",13,10,'$'  
-invader2 db "T",13,10,'$' 
-invader3 db "Y",13,10,'$' 
+inv_linea1 db "M   Y   T   M   Y   T   M   Y",13,10,'$' 
+inv_linea2 db "  M   Y   T   M   Y   T   M   Y",13,10,'$' 
+inv_linea3 db "M   Y   T   M   Y   T   M   Y",13,10,'$' 
+linea_base db 3
 tablero db "|------------------------------------------------|",13,10,"|Puntaje:                 Balas:                 |",10,13, "|------------------------------------------------|",'$'
 fil    DB 22
 col    DB 1  
 line_max db 7
 line_min db 3  
-misil db "!"
+misil db "!" ,'$'
 nave DB 'A','$'    
 
 .code              
@@ -18,8 +19,8 @@ main proc
     mov DS,AX
     mov es, ax 
 
-    mov BL, 2
-    mov CH, 1 
+    mov BL, 2    ;Y inicial
+    mov CH, 1    ;X inicial
         mover_der: 
             call mostrar_tabla
             call mover 
@@ -38,69 +39,49 @@ main proc
                 
                     ;IMPRIMIR 1ER INVASOR 
                     mov AH,2H
-                    mov BH,0            ;goto-XY
+                    mov BH,0            
                     mov DH,BL           ;Y
                     mov DL,CH           ;X
                     INT 10H
                 
                     mov AH,9H
-                    mov DX,offset invader1      ;print
+                    mov DX,offset inv_linea1    
                     INT 21H        
                     
                     ;IMPRIMIR 2DO INVASOR
                     mov AH,2H
-                    mov BH,0            ;goto-XY
+                    mov BH,0          
                     mov DH,BL   
                     mov DL,CH
-                    add dl, 4
+                    add dh, 1
                     INT 10H  
                     
                     mov AH,9H
-                    mov DX,offset invader2      ;print
+                    mov DX,offset inv_linea2    
                     INT 21H 
                     
                     ;IMPRIMIR 3ER INVASOR
                     mov AH,2H
-                    mov BH,0            ;goto-XY
+                    mov BH,0          
                     mov DH,BL 
                     mov DL,CH
-                    add dl, 8
+                    add dh, 2
                     INT 10H
                     
                     mov AH,9H
-                    mov DX,offset invader3      ;print
+                    mov DX,offset inv_linea3    
                     INT 21H   
-                    
+                                         
+                                         
+                    call finish
+                                         
                     add ch, 12  
                     dec cl    
                     cmp cl, 0
                     jne dibujar_linea 
-                    jmp sgte_linea
+                    ;jmp sgte_linea  
                     
-                sgte_linea: 
-                    pop dx
-                    pop cx            ;recuperar datos
-                    pop bx
-                    pop ax
                     
-                    cmp ch, 3
-                    je copia_linea                    
-                    add ch, 2
-                    
-                    inc bl
-                    cmp bl, line_max
-                    je resetear_pantalla    ;verificar cuantas lineas se imprimieron
-                    jmp print_inv
-                    
-                        
-                    
-                    copia_linea:
-                        sub ch, 2
-                        inc bl 
-                        cmp bl, line_max
-                        je resetear_pantalla    ;verificar cuantas lineas se imprimieron
-                        jmp print_inv
-                
                 
         
             ;RESETEAR TODA LA PANTALLA   
@@ -128,22 +109,22 @@ main proc
             ;MOVIMIENTO INVADERS
             inc ch
         
-            cmp CH, 3          ;?¦¦¦ COMPARE BL, NOT DH, BECAUSE
-            je mover_izq         ;     YOU LOST DH WHEN CLEARED SCREEN.
+            cmp CH, 3          
+            je mover_izq        
             jmp mover_der 
     
         mover_izq:
             call mostrar_tabla
             call mover
             
-            mov AH,2H           ;?¦¦¦ UNCOMMENT THIS BLOCK !!!
-            mov BH,0            ;goto-XY
+            mov AH,2H           
+            mov BH,0           
             mov DH,BL
             mov DL,1
             INT 10H
         
             mov AH,9H
-            mov DX,offset invader1      ;print
+            mov DX,offset inv_linea1    
             INT 21H
         
             mov AH, 6H 
@@ -155,8 +136,8 @@ main proc
             int 10H
         
             SUB BL, 1
-            cmp BL, 3         ;?¦¦¦ PERSONAL CHANGE : DETECT WHEN
-            jz mover_der        ;     CURSOR REACHES THE BORDER ?
+            cmp BL, 3         
+            jz mover_der        
             jmp mover_izq                             
         
         
@@ -166,7 +147,7 @@ main proc
             push cx
             push dx  
              
-            mov ah,13h
+            mov ah, 13h
             mov bp, offset tablero
             mov bh, 0
             mov bl, 4
@@ -181,19 +162,19 @@ main proc
             pop ax
             ret
         
-        mover:
+        mover:          ;Nave
             push ax
             push bx
             push cx
             push dx
             
-            mov ah, 2  ;Move cursor 
+            mov ah, 2  ;imprimir nave (x,y) 
             mov bh, 0 
             mov dh, fil
             mov dl, col  
             int 10h
             
-            mov  ah, 9   ;print message
+            mov  ah, 9   
             mov  dx,OFFSET nave
             int  21h
              
@@ -262,5 +243,8 @@ main proc
                 pop ax        
                 ret
             
+            finish:
+                mov ax, 4c0h
+                int 21h
             
 end main 
