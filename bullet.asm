@@ -50,7 +50,7 @@ check_for_keypressed:
     get_key_pressed: 
         mov  ah,0
         int 16h
-        cmp ah, 48h    ;up arplayerY
+        cmp ah, 48h    ;up arrow
         je set_bullet            
         jmp check_for_keypressed
         
@@ -116,7 +116,8 @@ paint_game:
 		ret
    
    explode:    
-		call clear_bullet
+		call clear_bullet   
+		;kill alien: set the var at this memory address to empty
 		mov  ah,13h    
     	mov  bp,offset explodedBullet 
     	mov  bh,0 
