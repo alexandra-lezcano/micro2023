@@ -1,11 +1,16 @@
 .model small
 .data  
-    bullet db " * ",13,10,'$'
+    bullet db "*",13,10,'$'
 	explodedBullet db "#",13,10,'$'
-    player db "(&)",13,10,'$'
-    alien db "öwö",13,10,'$'
+    player db "^",13,10,'$'
+    alien db "@",13,10,'$' 
     
-    GAME_HEIGHT EQU 15 	
+	; Game world dimensions
+    CEILING EQU 2 	
+    FLOOR EQU 20
+    LEFT EQU 2
+    RIGHT EQU 40
+	
 	RED EQU 4
 	LIGHT_GREEN EQU 10
 	YELLOW EQU 14	
@@ -20,6 +25,11 @@
 	
 	alienX db 20
 	alienY db 5
+	
+	pointsMsg db "Puntaje: $"
+	bulletsMsg db "  Balas: $"
+	pointCount db 0
+	bulletCount db 5
 
 .code
 game:
@@ -27,7 +37,7 @@ game:
     mov ds,ax
     mov  es,ax    
 	
-	call check_for_keypressed
+	call check_for_keypressed 
 	call paint_game
 	call clean_screen
 	jmp game
@@ -55,17 +65,19 @@ check_for_keypressed:
         jmp check_for_keypressed
         
     set_bullet: ; just say a bullet exists       
-        mov bulletExists, 1    	
+        mov bulletExists, 1   
+        dec bulletCount 	
 	    ret    
 	
 	clear_bullet: 
 		mov bulletExists, 0    	
 	    ret
 
-paint_game:
+paint_game:       
     call display_player
 	call display_alien
-    call check_for_bullets   
+    call check_for_bullets
+	call show_messages 	
 	
 	cmp tmpBulletY, 0 ; end game if bullet is at 0
     je end_game 
@@ -115,9 +127,11 @@ paint_game:
     	dec tmpBulletY  		
 		ret
    
+   ; make bullet count: 0 (no bullet exists) 
+   ; make alien be a null string 
    explode:    
-		call clear_bullet   
-		;kill alien: set the var at this memory address to empty
+		call clear_bullet   		
+		call kill_alien
 		mov  ah,13h    
     	mov  bp,offset explodedBullet 
     	mov  bh,0 
@@ -128,16 +142,64 @@ paint_game:
     	int  10h      
 		ret
     
+	kill_alien:
+		mov byte ptr[alien],00h
+		;mov byte ptr[bullet],00
+		;call display_alien
+		ret
+	
 
 ;helpers
+
+show_messages:    
+    push ax
+    push bx
+    push dx
+    
+    mov ax,@data
+    mov ds,ax
+    mov  es,ax
+
+    mov ah, 2    ; set cursor position  
+    mov bh, 0
+    mov dl, 2        
+    mov dh, 23        
+    int 10h
+       
+    mov dx, offset pointsMsg
+    mov ah,9h 
+    int 21h
+	
+	mov dl,pointCount   
+    add dl, 30h ;convert ascii to decimal
+    mov ah,2h
+    int 21h 
+	
+	mov dx, offset bulletsMsg
+    mov ah,9h 
+    int 21h
+	
+	mov dl,bulletCount   
+    add dl,30h 
+    mov ah,2h
+    int 21h 
+    
+    pop ax
+    pop bx
+    pop dx
+    
+	ret
+
+
+	
 clean_screen: 
-	mov AH, 6H 
-	mov AL, 0    
-	mov BH, 7         
-	mov CX, 0
-	mov DL, 79
-	mov DH, 24
-	int 10H 
+	mov ah, 6h 
+	mov al, 0    
+	mov bh, 7         
+	mov cx, 0
+	mov dl, 79
+	mov dh, 24
+	int 10h 
 	ret
  
 end_game: 
