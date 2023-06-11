@@ -19,7 +19,7 @@
     playerY db 20
     playerX db 20 
  
-    bulletExists db 0
+    ;bulletExists db 0
     tmpBulletY db 18 
     tmpBulletX db 20
 	
@@ -29,26 +29,27 @@
 	pointsMsg db "Puntaje: $"
 	bulletsMsg db "  Balas: $"
 	pointCount db 0
-	bulletCount db 5
+	bulletCount db 5   
+	 
+	; bullet information: posX, posY, exists, hasCollision
+	bulletPosX db 5 dup(0) 
+	bulletPosY db 5 dup(0)   
+	bulletExists db 5 dup(0)
+	bulletCollision db 5 dup(0)  
+    isShooting db 0   ; set true when the user clicks the up arrow
+    bulletIndex db 0 ; use as counter to access the bullet array
 
-.code
-game:
-	mov ax,@data
-    mov ds,ax
-    mov  es,ax    
-	
-	call check_for_keypressed 
+.code   
+mov ax,@data
+mov ds,ax
+mov  es,ax 
+
+game:     	
+	call check_for_keypressed          
+	call calc_bullet_position
 	call paint_game
 	call clean_screen
 	jmp game
-	
-	; wait for user input
-	; if input then bala 
-	; else 
-	; print scene 
-	; clean screan
-	; wait for input
-	
 
 check_for_keypressed:
 	mov ah, 0bh    
@@ -58,30 +59,125 @@ check_for_keypressed:
 	ret
 		
     get_key_pressed: 
-        mov  ah,0
+        mov ah,0
         int 16h
         cmp ah, 48h    ;up arrow
-        je set_bullet            
+        je set_bullet           
         jmp check_for_keypressed
         
     set_bullet: ; just say a bullet exists       
-        mov bulletExists, 1   
-        dec bulletCount 	
+        ;mov bulletExists, 1    
+        mov isShooting, 1
 	    ret    
 	
 	clear_bullet: 
 		mov bulletExists, 0    	
 	    ret
+ 
+    
+calc_bullet_position:
+	call check_for_shooting
+	continue_calc_bullets:
+	call move_bullets
+	continue_calc:
+	ret
+ 
+	check_for_shooting:
+		; if there's no shooting I need to continue execution 
+        mov al, isShooting
+        cmp al, 0		
+        je continue_calc_bullets     
+		
+		; reset shooting flag 	
+		mov al, 0 
+		mov isShooting, al		
+		
+        ; else if we don't have bullets jump to continue_calc_bullets
+        mov al, bulletCount
+        cmp al, 0
+        je continue_calc_bullets        
+        
+		; Check is this bullet already in use?        
+		mov bx, 0
+        mov al, bulletIndex       
+        mov bl, al
+		lea si, [ bulletExists + bx ] ; load array base pointer and get data at bulletIndex 
+		mov dl, [si] ; dl tiene el dato que necesitamos
+		
+		; if bullet already exists jump to continue_calc 
+        cmp dl, 1                  
+        je continue_calc_bullets 
+		
+		; else set bullet exists at index and tmp position
+        mov al, 1
+        mov byte ptr[si], al  ; bulletExists[bulletIndex] = 1	  
 
-paint_game:       
+        mov al, bulletIndex       
+        mov bl, al
+		lea si, [ bulletPosX + bx ]  
+		mov al, 0
+		mov byte ptr[si], al ; bulletPosX[bulletIndex] = 0	  
+		
+	
+	; move bullet upwards for each bullet EXCEPT the one that I just set 
+	; si la bala existe y la pos es 0 seterar a la pos del user, else inc Y
+	move_bullets:  
+		; for each bullet, decrease postY if it exists 
+		mov si, 0
+		
+		loop_bullets: 
+			cmp si, 5
+			je continue_calc ; if 5==5 break loop
+			
+			; if bullet exists 
+			mov al, bulletExists[si]
+			cmp al, 1
+			je dec_bullet_posY
+			
+			; else ignore it
+			inc si
+			jmp loop_bullets
+			
+			
+			; if bullet has posX == 0 means we've just created it
+			dec_bullet_posY:
+				mov al, bulletPosX[si]
+				cmp al, 0
+				je set_new_bullet
+				
+				;else inc bulletPosY
+				mov al, bulletPosY[si] 
+				dec al
+				mov bulletPosY[si], al 
+				
+				inc si
+				jmp loop_bullets
+			
+			set_new_bullet: 
+				mov al, tmpBulletY    
+				mov bulletPosY[si], al
+				
+				mov al, playerX  
+				mov bulletPosx[si], al
+				
+				; upadte the bullet counters for a new bullet
+				inc bulletIndex 
+				dec bulletCount
+				
+				inc si
+				jmp loop_bullets
+				
+paint_game:   
+       
     call display_player
 	call display_alien
-    call check_for_bullets
+    call display_bullets
+	
+	continue_painting:	; helper tag for me to handle loop breaks
 	call show_messages 	
-	
-	cmp tmpBulletY, 0 ; end game if bullet is at 0
-    je end_game 
-	
+	ret
+   
+   
     display_player:
         mov  ah,13h    
         mov  bp,offset player 
@@ -104,7 +200,47 @@ paint_game:
         int  10h 
         ret
 	
-    check_for_bullets: 
+	display_bullets:
+		mov si, 0
+		
+		display_bullets_loop:
+			cmp si, 5
+			je continue_painting ; if 5==5 break loop
+			
+			; if bullet exists paint it
+			mov al, bulletExists[si]
+			cmp al, 1
+			je paint_single_bullet
+			
+			; else ignore it
+			inc si
+			jmp loop_bullets 
+			
+			paint_single_bullet:
+				push ax
+				push bx
+				push dx
+				push cx
+				
+				mov  ah,13h    
+				mov  bp,offset bullet 
+				mov  bh,0 
+				mov  bl, WHITE 
+				mov  cx,1 
+				mov  dl,bulletPosx[si]        ;x
+				mov  dh,bulletPosY[si]        ;y
+				int  10h      
+				
+				pop cx
+				pop dx
+				pop bx
+				pop ax
+				
+				inc si
+				jmp display_bullets_loop
+
+	
+   check_for_bullets: 
         cmp bulletExists, 1
         je move_bullet  
         ret
