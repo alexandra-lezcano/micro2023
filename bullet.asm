@@ -37,7 +37,14 @@
 	bulletExists db 5 dup(0)
 	bulletCollision db 5 dup(0)  
     bulletIndex db 0 ; use as counter to access the bullet array
-
+	
+	alienPosX db 16d, 17d, 18d, 19d, 20d, 21d, 22d, 23d, 24d
+	alienPosY db 5d, 6d, 7d, 5d, 6d, 7d, 5d, 6d, 7d
+	alienExists db 9 dup(0)           
+	
+	gameOver db 0
+	gameOverMsg db "GAME OVER! $"
+	
 .code   
 mov ax,@data
 mov ds,ax
@@ -47,10 +54,13 @@ game:
 	call check_for_keypressed          
 	call calc_bullet_position
 	call paint_game
+	call calc_alienPosY
 	call clean_screen
 	jmp game
 
+; HANDLE USER INPUT
 check_for_keypressed:
+
 	mov ah, 0bh    
 	int 21h  
 	cmp al, 0
@@ -106,13 +116,16 @@ check_for_keypressed:
 		mov bulletExists, 0    	
 	    ret
  
+; CALCULATE NEXT FRAME
+ 
 ; move bullet upwards - for each bullet, decrease postY if it exists    
-calc_bullet_position: 
+calc_bullet_position:
+ 
 	mov si, 0
 	
 	loop_bullets: 
 		cmp si, 5
-		je continue_calc ; if 5==5 break loop
+		je exit_loop_bullets ; if 5==5 break loop
 		
 		; if bullet exists 
 		mov al, bulletExists[si]
@@ -143,13 +156,42 @@ calc_bullet_position:
 			inc si
 			jmp loop_bullets	
 				
-	continue_calc:
+	exit_loop_bullets:
 	ret	
-				
+
+calc_alienPosY:
+
+	mov si, 0
+
+	loop_alienPosY:
+		cmp si, 3
+		je exit_loop_alien
+		     
+		mov al, alienPosY[si]
+		inc al
+		mov alienPosY[si], al
+		mov alienPosY[si + 3], al
+		mov alienPosY[si + 6], al
+		 
+		mov ah, alienPosY[si + 6] 
+		cmp ah, 20
+		je set_game_over ; break the loop if one alien is at player position             
+		 
+		inc si 
+		jmp loop_alienPosY
+	 
+	set_game_over: 
+	    inc gameOver
+	     
+	exit_loop_alien:
+	ret
+
+
+; PAINT THE ACTUAL GAME				
 paint_game:   
        
     call display_player
-	call display_alien
+	call display_alien	
     call display_bullets
 	
 	continue_painting:	; helper tag for me to handle loop breaks
@@ -185,14 +227,33 @@ paint_game:
 		push dx
 		push cx  
 		
-		mov  ah,13h    
-        mov  bp,offset alien 
-        mov  bh,0 
-        mov  bl, LIGHT_GREEN 
-        mov  cx,1 
-        mov  dl,alienX 
-        mov  dh,alienY  
-        int  10h   
+		mov ax,@data
+		mov ds,ax
+		mov es,ax  
+		
+		mov si, 0 
+		
+		loop_paint_alien: 
+			cmp si, 9
+			je exit_loop_paint_alien
+			
+			mov ah,13h   
+			;mov al, 1
+			mov bp,offset alien 
+			mov bh,0 
+			mov bl,LIGHT_GREEN 
+			mov cx,1 
+			mov dl,alienPosX[si]        ;x
+			mov dh,alienPosY[si]        ;y
+			int 10h      
+			
+			inc si
+			jmp loop_paint_alien
+		
+		exit_loop_paint_alien: 
+		
+		cmp gameOver, 0
+		jne end_game 
         
         pop ax
 		pop bx
@@ -341,6 +402,20 @@ clean_screen:
 	ret
  
 end_game: 
+	call clean_screen
+    
+    mov ah, 2    ; set cursor position  
+    mov bh, 0
+    mov dl, 17        
+    mov dh, 11        
+    int 10h
+     
+    mov dx, offset gameOverMsg
+    mov ah,9h 
+    int 21h
+    
+    call show_messages
+    
 	mov ah, 4ch
     int 21h     
 end game
