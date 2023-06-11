@@ -33,7 +33,7 @@
 	 
 	; bullet information: posX, posY, exists, hasCollision
 	bulletPosX db 5 dup(0) 
-	bulletPosY db 5 dup(0)   
+	bulletPosY db 5 dup(18)   
 	bulletExists db 5 dup(0)
 	bulletCollision db 5 dup(0)  
     isShooting db 0   ; set true when the user clicks the up arrow
@@ -64,108 +64,73 @@ check_for_keypressed:
         cmp ah, 48h    ;up arrow
         je set_bullet           
         jmp check_for_keypressed
+     
+    ; create new bullet at bulletIndex   
+    set_bullet:  
+        ; if we don't have bullets jump to ret
+        mov al, bulletCount
+        cmp al, 0
+        je ret_from_set_bullet        
         
-    set_bullet: ; just say a bullet exists       
-        ;mov bulletExists, 1    
-        mov isShooting, 1
+		; Set bullet X, Y if it doesn't exist      
+		mov bx, 0
+        mov al, bulletIndex       
+        mov bl, al
+		lea si, [ bulletExists + bx ] 
+		mov dl, [si] ; dl = bulletExists[bulletIndex]	
+        cmp dl, 1                  
+        je ret_from_set_bullet 
+		
+		; else set bullet exists at index and give it X 
+        mov al, 1
+        mov byte ptr[si], al  ; bulletExists[bulletIndex] = 1 
+		
+		mov bx, 0
+        mov al, bulletIndex       
+        mov bl, al
+		lea si, [ bulletPosX + bx ]
+		mov al, playerX
+		mov byte ptr[si], al  ; bulletPosX[bulletIndex] = playerPosX 
+		
+		; upadte the bullet counters for a new bullet
+		inc bulletIndex 
+		dec bulletCount
+		
+		ret_from_set_bullet:
 	    ret    
 	
 	clear_bullet: 
 		mov bulletExists, 0    	
 	    ret
  
-    
-calc_bullet_position:
-	call check_for_shooting
-	continue_calc_bullets:
-	call move_bullets
-	continue_calc:
-	ret
- 
-	check_for_shooting:
-		; if there's no shooting I need to continue execution 
-        mov al, isShooting
-        cmp al, 0		
-        je continue_calc_bullets     
-		
-		; reset shooting flag 	
-		mov al, 0 
-		mov isShooting, al		
-		
-        ; else if we don't have bullets jump to continue_calc_bullets
-        mov al, bulletCount
-        cmp al, 0
-        je continue_calc_bullets        
-        
-		; Check is this bullet already in use?        
-		mov bx, 0
-        mov al, bulletIndex       
-        mov bl, al
-		lea si, [ bulletExists + bx ] ; load array base pointer and get data at bulletIndex 
-		mov dl, [si] ; dl tiene el dato que necesitamos
-		
-		; if bullet already exists jump to continue_calc 
-        cmp dl, 1                  
-        je continue_calc_bullets 
-		
-		; else set bullet exists at index and tmp position
-        mov al, 1
-        mov byte ptr[si], al  ; bulletExists[bulletIndex] = 1	  
-
-        mov al, bulletIndex       
-        mov bl, al
-		lea si, [ bulletPosX + bx ]  
-		mov al, 0
-		mov byte ptr[si], al ; bulletPosX[bulletIndex] = 0	  
-		
+; move bullet upwards - for each bullet, decrease postY if it exists    
+calc_bullet_position: 
+	mov si, 0
 	
-	; move bullet upwards for each bullet EXCEPT the one that I just set 
-	; si la bala existe y la pos es 0 seterar a la pos del user, else inc Y
-	move_bullets:  
-		; for each bullet, decrease postY if it exists 
-		mov si, 0
+	loop_bullets: 
+		cmp si, 5
+		je continue_calc ; if 5==5 break loop
 		
-		loop_bullets: 
-			cmp si, 5
-			je continue_calc ; if 5==5 break loop
-			
-			; if bullet exists 
-			mov al, bulletExists[si]
-			cmp al, 1
-			je dec_bullet_posY
-			
-			; else ignore it
+		; if bullet exists 
+		mov al, bulletExists[si]
+		cmp al, 1
+		je dec_bullet_posY
+		
+		; else ignore it
+		inc si
+		jmp loop_bullets
+		
+		
+		; move bullet up
+		dec_bullet_posY:
+			mov al, bulletPosY[si] 
+			dec al
+			mov bulletPosY[si], al 				
 			inc si
 			jmp loop_bullets
-			
-			
-			; if bullet has posX == 0 means we've just created it
-			dec_bullet_posY:
-				mov al, bulletPosX[si]
-				cmp al, 0
-				je set_new_bullet
-				
-				;else inc bulletPosY
-				mov al, bulletPosY[si] 
-				dec al
-				mov bulletPosY[si], al 
-				
-				inc si
-				jmp loop_bullets
-			
-			set_new_bullet: 
-				mov al, tmpBulletY    
-				mov bulletPosY[si], al
-				
-				mov al, playerX  
-				mov bulletPosx[si], al
-				
-				; upadte the bullet counters for a new bullet
-				inc bulletIndex 
-				dec bulletCount
-				
-				inc si
-				jmp loop_bullets
+	
+	continue_calc:
+	ret	
 				
 paint_game:   
        
