@@ -30,25 +30,93 @@
 	bulletsMsg db "  Balas: $"
 	pointCount db 0
 	bulletCount db 5   
-	 
+	
+	gameOverMsg db "GAME OVER! $"
+	
 	; bullet information: posX, posY, exists, hasCollision
 	bulletPosX db 5 dup(0) 
 	bulletPosY db 5 dup(18)   
 	bulletExists db 5 dup(0)
 	bulletCollision db 5 dup(0)  
     bulletIndex db 0 ; use as counter to access the bullet array
+	
+	alienPosX db 16d, 17d, 18d, 19d, 20d, 21d, 22d, 23d, 24d
+	alienPosY db 5d, 6d, 7d, 5d, 6d, 7d, 5d, 6d, 7d
+	alienExists db 9 dup(0)           
+	
+	gameOver db 0
 
 .code   
 mov ax,@data
 mov ds,ax
 mov es,ax 
 
-game:     	
-	call check_for_keypressed          
-	call calc_bullet_position
-	call paint_game
+game:  
+	call paint_aliens   	
+	call cal_alienPosY          
 	call clean_screen
 	jmp game
+
+cal_alienPosY:
+
+	mov si, 0
+
+	loop_alienPosY:
+		cmp si, 3
+		je exit_loop_alien
+		   
+		  
+		mov al, alienPosY[si]
+		inc al
+		mov alienPosY[si], al
+		mov alienPosY[si + 3], al
+		mov alienPosY[si + 6], al
+		 
+		mov ah, alienPosY[si + 6] 
+		cmp ah, 20
+		je set_game_over ; break the loop if one alien is at player position             
+		 
+		inc si 
+		jmp loop_alienPosY
+	 
+	set_game_over: 
+	    inc gameOver
+	     
+	exit_loop_alien:
+	ret
+	
+paint_aliens:    
+    mov ax,@data
+    mov ds,ax
+    mov es,ax  
+    
+	mov si, 0 
+	
+	loop_paint_alien: 
+		cmp si, 9
+		je exit_loop_paint_alien
+		
+		mov ah,13h   
+		;mov al, 1
+		mov bp,offset alien 
+		mov bh,0 
+		mov bl,LIGHT_GREEN 
+		mov cx,1 
+		mov dl,alienPosX[si]        ;x
+		mov dh,alienPosY[si]        ;y
+		int 10h      
+		
+		inc si
+		jmp loop_paint_alien
+	
+	exit_loop_paint_alien: 
+	
+	cmp gameOver, 0
+	jne end_game 
+	
+	ret
+
+
 
 check_for_keypressed:
 	mov ah, 0bh    
@@ -340,7 +408,21 @@ clean_screen:
 	int 10h 
 	ret
  
-end_game: 
+end_game:
+    call clean_screen
+    
+    mov ah, 2    ; set cursor position  
+    mov bh, 0
+    mov dl, 17        
+    mov dh, 11        
+    int 10h
+     
+    mov dx, offset gameOverMsg
+    mov ah,9h 
+    int 21h
+    
+    call show_messages
+    
 	mov ah, 4ch
     int 21h     
 end game
