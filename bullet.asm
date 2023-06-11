@@ -38,9 +38,9 @@
 	bulletCollision db 5 dup(0)  
     bulletIndex db 0 ; use as counter to access the bullet array
 	
-	alienPosX db 16d, 17d, 18d, 19d, 20d, 21d, 22d, 23d, 24d
-	alienPosY db 5d, 6d, 7d, 5d, 6d, 7d, 5d, 6d, 7d
-	alienExists db 9 dup(0)           
+	alienPosX db 16, 17, 18, 19, 20, 21, 22, 23, 24
+	alienPosY db 12, 13, 14, 12, 13, 14, 12, 13, 14
+	alienExists db 9 dup(1)           
 	
 	gameOver db 0
 	gameOverMsg db "GAME OVER! $"
@@ -51,10 +51,13 @@ mov ds,ax
 mov es,ax 
 
 game:     	
-	call check_for_keypressed          
-	call calc_bullet_position
+	call check_for_keypressed 
 	call paint_game
+	
 	call calc_alienPosY
+	call calc_bullet_position
+	
+	call show_messages
 	call clean_screen
 	jmp game
 
@@ -139,20 +142,59 @@ calc_bullet_position:
 		
 		; move bullet up
 		dec_bullet_posY:
-			mov al, bulletPosY[si] 
+			mov al, bulletPosY[si]  
 			dec al
+			mov bulletPosY[si], al 
 			
 			; remove bullet if it hit the cealing
 			cmp al, CEILING 
 			je remove_bullet 
 			
-			mov bulletPosY[si], al 				
+			; check for collisions: 
+			; if bulletX == alienX
+			; 	if bulletY == alienY 
+			mov bp, 0 
+			
+			forEach_alien:   
+				cmp bp, 9
+				je break_forEach_alien_loop
+				
+				mov bh, alienExists[bp]
+				cmp bh, 0
+				je continue_forEach_alien_loop
+				
+				mov bl, bulletPosX[si]
+				mov bh, alienPosX[bp]				
+				sub bl, bh
+				cmp bl, 0
+				jne continue_forEach_alien_loop
+				
+				mov bl, bulletPosY[si]
+				mov bh, alienPosY[bp] 
+				sub bl, bh
+				cmp bl, 0				
+				jne continue_forEach_alien_loop
+				
+				; set there was a collision, and set alien doesn't exist
+				mov cl, 1
+				mov bulletCollision[si], cl
+				
+				mov ch, 0
+				mov alienExists[bp], ch
+				
+				continue_forEach_alien_loop:
+				inc bp
+				jmp forEach_alien
+			
+			; if there wasn't any collision this bullet continues moving upwards			
+			break_forEach_alien_loop:		
 			inc si
 			jmp loop_bullets
 		
 		remove_bullet:
 			mov ah, 0
-			mov bulletExists[si], ah			
+			mov bulletExists[si], ah	
+		
 			inc si
 			jmp loop_bullets	
 				
@@ -164,19 +206,23 @@ calc_alienPosY:
 	mov si, 0
 
 	loop_alienPosY:
-		cmp si, 3
+		cmp si, 9
 		je exit_loop_alien
+		
+		mov ah, alienExists[si]
+		cmp ah, 0
+		je continue_loop_alienPostY
 		     
 		mov al, alienPosY[si]
 		inc al
+		
 		mov alienPosY[si], al
-		mov alienPosY[si + 3], al
-		mov alienPosY[si + 6], al
 		 
-		mov ah, alienPosY[si + 6] 
+		mov ah, alienPosY[si] 
 		cmp ah, 20
-		je set_game_over ; break the loop if one alien is at player position             
+		je set_game_over ; break the loop if one alien is at player position 			
 		 
+		continue_loop_alienPostY:
 		inc si 
 		jmp loop_alienPosY
 	 
@@ -192,10 +238,7 @@ paint_game:
        
     call display_player
 	call display_alien	
-    call display_bullets
-	
-	continue_painting:	; helper tag for me to handle loop breaks
-	call show_messages 	
+    call display_bullets	 	
 	ret
    
    
@@ -237,8 +280,11 @@ paint_game:
 			cmp si, 9
 			je exit_loop_paint_alien
 			
+			mov ch, alienExists[si]
+			cmp ch, 0
+			je continue_painting_aliens
+			
 			mov ah,13h   
-			;mov al, 1
 			mov bp,offset alien 
 			mov bh,0 
 			mov bl,LIGHT_GREEN 
@@ -247,11 +293,11 @@ paint_game:
 			mov dh,alienPosY[si]        ;y
 			int 10h      
 			
+			continue_painting_aliens:
 			inc si
 			jmp loop_paint_alien
 		
 		exit_loop_paint_alien: 
-		
 		cmp gameOver, 0
 		jne end_game 
         
@@ -262,89 +308,64 @@ paint_game:
         ret
 	
 	display_bullets:
+		push ax
+		push bx
+		push dx
+		push cx
+					
 		mov si, 0
 		
 		display_bullets_loop:
 			cmp si, 5
-			je continue_painting ; if 5==5 break loop
+			je exit_display_bullets_loop ; if 5==5 break loop
 			
-			; if bullet exists paint it
+			; if bullet exists, check its state, could be moving or could be on a collision
 			mov al, bulletExists[si]
 			cmp al, 1
-			je paint_single_bullet
+			je check_bullet_state
 			
 			; else ignore it
-			inc si
-			jmp display_bullets_loop 
+			jmp continue_painting_bullets 
 			
-			paint_single_bullet:
-				push ax
-				push bx
-				push dx
-				push cx
+				check_bullet_state:
+					mov ch, bulletCollision[si]
+					cmp ch, 0
+					je paint_single_bullet
+					
+					mov  ah,13h    
+					mov  bp,offset explodedBullet 
+					mov  bh,0 
+					mov  bl, RED 
+					mov  cx,1 
+					mov  dl,bulletPosx[si]        ;x
+					mov  dh,bulletPosY[si]        ;y
+					int  10h      
+					
+					mov cl, 0
+					mov bulletExists[si], cl
 				
-				mov  ah,13h    
-				mov  bp,offset bullet 
-				mov  bh,0 
-				mov  bl, WHITE 
-				mov  cx,1 
-				mov  dl,bulletPosx[si]        ;x
-				mov  dh,bulletPosY[si]        ;y
-				int  10h      
+					jmp continue_painting_bullets
 				
+					paint_single_bullet:
+						mov  ah,13h    
+						mov  bp,offset bullet 
+						mov  bh,0 
+						mov  bl, WHITE 
+						mov  cx,1 
+						mov  dl,bulletPosx[si]        ;x
+						mov  dh,bulletPosY[si]        ;y
+						int  10h      
+							
+				continue_painting_bullets:
+				inc si
+				jmp display_bullets_loop
+				
+				exit_display_bullets_loop:
 				pop ax
 				pop bx
 				pop cx
 				pop dx
-				
-				inc si
-				jmp display_bullets_loop
-
-	
-   check_for_bullets: 
-        cmp bulletExists, 1
-        je move_bullet  
-        ret
-        
-    move_bullet: 
-        mov ah,tmpBulletY  
-        mov al, alienY
-        sub ah, al
-	    cmp ah, 0
-		je explode
-		
-        mov  ah,13h    
-    	mov  bp,offset bullet 
-    	mov  bh,0 
-    	mov  bl, WHITE 
-    	mov  cx,3 
-    	mov  dl,tmpBulletX        ;x
-    	mov  dh,tmpBulletY        ;y
-    	int  10h      
-    	dec tmpBulletY  		
-		ret
-   
-   ; make bullet count: 0 (no bullet exists) 
-   ; make alien be a null string 
-   explode:    
-		call clear_bullet   		
-		call kill_alien
-		mov  ah,13h    
-    	mov  bp,offset explodedBullet 
-    	mov  bh,0 
-    	mov  bl, RED 
-    	mov  cx,3 
-    	mov  dl,tmpBulletX        ;x
-    	mov  dh,tmpBulletY        ;y
-    	int  10h      
-		ret
-    
-	kill_alien:
-		mov byte ptr[alien],00h
-		;mov byte ptr[bullet],00
-		;call display_alien
-		ret
-	
+				ret
 
 ;helpers
 
