@@ -18,10 +18,6 @@
 	
     playerY db 20
     playerX db 20 
- 
-    ;bulletExists db 0
-    tmpBulletY db 18
-    tmpBulletX db 20
 	
 	alienX db 20 
 	alienY db 5
@@ -39,7 +35,7 @@
     bulletIndex db 0 ; use as counter to access the bullet array
 	
 	alienPosX db 16, 17, 18, 19, 20, 21, 22, 23, 24
-	alienPosY db 12, 13, 14, 12, 13, 14, 12, 13, 14
+	alienPosY db 5, 6, 7, 5, 6, 7, 5, 6, 7
 	alienExists db 9 dup(1)           
 	
 	gameOver db 0
@@ -73,10 +69,19 @@ check_for_keypressed:
     get_key_pressed: 
         mov ah,0
         int 16h
-        cmp ah, 48h    ;up arrow
-        je set_bullet           
-        jmp check_for_keypressed
-     
+       
+		cmp ah, 48h    ;up arrow
+        je set_bullet          
+		
+		cmp ah, 4Bh  ;left arrow
+		je move_player_left
+		
+		cmp ah, 4Dh  ;right arrow
+		je move_player_right
+    
+		jmp check_for_keypressed
+		
+	;; handle keypress	
     ; create new bullet at bulletIndex   
     set_bullet:  
         ; if bulletCount ==0 or bulletIndex == 5 jump to ret
@@ -106,7 +111,7 @@ check_for_keypressed:
         mov bl, al
 		lea si, [ bulletPosX + bx ]
 		mov al, playerX
-		mov byte ptr[si], al  ; bulletPosX[bulletIndex] = playerPosX 
+		mov byte ptr[si], al  ; bulletPosX[bulletIndex] = playerX 
 		
 		; upadte the bullet counters for a new bullet
 		inc bulletIndex 
@@ -115,9 +120,13 @@ check_for_keypressed:
 		ret_from_set_bullet:
 	    ret    
 	
-	clear_bullet: 
-		mov bulletExists, 0    	
-	    ret
+	move_player_left:
+		dec playerX
+		ret
+	
+	move_player_right:
+		inc playerX
+		ret	
  
 ; CALCULATE NEXT FRAME
  
@@ -194,6 +203,7 @@ calc_bullet_position:
 				mov ch, 0
 				mov alienExists[bp], ch 
 				
+				inc pointCount
 				inc si
 				jmp loop_bullets
 			     	 
