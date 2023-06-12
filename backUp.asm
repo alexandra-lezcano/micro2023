@@ -139,14 +139,17 @@ calc_bullet_position:
 		inc si
 		jmp loop_bullets
 		
+		
 		; move bullet up
 		dec_bullet_posY:
-			; ignore bullets that exist and have a collision 
+			; ignore bullets that exist and have a collision (this collision could've been made by an alien loop)
 			mov ah, bulletCollision[si]
 			cmp ah, 1
 			je loop_bullets
 			
 			mov al, bulletPosY[si]  
+			dec al
+			mov bulletPosY[si], al 
 			
 			; remove bullet if it hit the cealing
 			cmp al, CEILING 
@@ -177,40 +180,28 @@ calc_bullet_position:
 				cmp bl, 0				
 				jne continue_forEach_alien_loop
 				
-				;if there was a collision I will take this branch
-				jmp set_collision_and_exit
-				
-				; no collision or alien doesn't exist
-				continue_forEach_alien_loop:
-    				inc bp
-    				jmp forEach_alien
-			
-			;;; branches for bullet position:    
-		    ; collision detected
-		    set_collision_and_exit:    
+				; set there was a collision, and set alien doesn't exist
 				mov cl, 1
 				mov bulletCollision[si], cl
 				
 				mov ch, 0
-				mov alienExists[bp], ch 
+				mov alienExists[bp], ch
 				
-				inc si
-				jmp loop_bullets
-			     	 
-			; there wasn't any collision this bullet continues moving upwards			
-			break_forEach_alien_loop:	
-    			dec al
-    			mov bulletPosY[si], al			
-    			inc si
-    			jmp loop_bullets
-		   
-		    ; bullet gets to the ceiling
-    		remove_bullet:
-    			mov ah, 0
-    			mov bulletExists[si], ah	
-    		
-    			inc si
-    			jmp loop_bullets	
+				continue_forEach_alien_loop:
+				inc bp
+				jmp forEach_alien
+			
+			; if there wasn't any collision this bullet continues moving upwards			
+			break_forEach_alien_loop:		
+			inc si
+			jmp loop_bullets
+		
+		remove_bullet:
+			mov ah, 0
+			mov bulletExists[si], ah	
+		
+			inc si
+			jmp loop_bullets	
 				
 	exit_loop_bullets:
 	ret	
@@ -233,6 +224,39 @@ calc_alienPosY:
 		
 		cmp al, 20
 		je set_game_over ; break the loop if one alien is at player position 			
+		
+		; check for bullets on next alien move 
+		mov bp,0
+		forEach_bullet: 
+			cmp bp, 5
+			je continue_loop_alienPostY
+			
+			mov bl, bulletExists[bp]
+			cmp bl, 0
+			je continue_forEach_bullet_loop
+			
+			mov bl, bulletPosY[bp]
+			sub bl, al
+			cmp bl, 0
+			jne continue_forEach_bullet_loop ;bulletPosY != alienPosY
+			
+			mov bh, bulletPosX[bp]
+			mov ah, alienPosX[si]
+			sub bh, ah
+			cmp bh, 0
+			jne continue_forEach_bullet_loop ; bulletPosX!=alienPosX
+			
+			; set there was a collision, and set alien doesn't exist
+			mov cl, 1
+			mov bulletCollision[si], cl
+			
+			mov ch, 0
+			mov alienExists[bp], ch
+			
+			continue_forEach_bullet_loop:
+			inc bp
+			jmp forEach_bullet
+		
 		
 		continue_loop_alienPostY:
 		inc si 
