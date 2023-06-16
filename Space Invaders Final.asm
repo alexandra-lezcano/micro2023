@@ -20,48 +20,18 @@
                  db "                          ` | '",13,10,0
                  db "", '$'     
                  
-    winDesign db "     .  . '    .                                             ",13,10,0
-             db "      '   .            . '            .                +           ",13,10,0
-             db "              `                          '    . '                   ",13,10,0
-             db "        .                         ,'`.                         .  ",13,10,0
-             db "   .                  ..""    _.-;'    `.              .         ",13,10,0
-             db "             _.-""`.##%""_.--"" ,'        `.          ""#""/////___,,",13,10,0
-             db "           ,'"_"- _.-.--""\   ,'            `-_       '%%',,/////0000",13,10,0
-             db "        ,'     |_.'     )`/-     __..--""`-_`-._    JL/////00000HHHHM",13,10,0
-             db " . +   ,'   _.-""        / /   _-""         `-._`-_/__ \///0000HHHHMMM",13,10,0
-             db "     .'_.-""      '    :_/_.-'                _,`-/__V__\0000HHHHHMMM",13,10,0
-             db " . _-""                         .      '    _,////\  |  /000HHHHHMMMM",13,10,0
-             db "_-""   .       '  +  .            .         ,//////\ | /00HHHHHHHMMMM",13,10,0
-             db "       `                                  ,//////000\|/00HHHHHHHMMMMM",13,10,0
-             db ".             '       .  ' .   .     '  ,//////000000|0HHHHHHHHMMMMMM",13,10,0
-             db "     .             .    .    '         ,//////0000000|00HHHHHHHMMMMMM",13,10,0
-             db "                  .  '      .     .   ,//////0000000|0HHHHHHHHMMMMMMM",13,10,0
-             db "  '             '        .    '      ///////0000000|00HHHHHHHMMMMMMMM",13,10,0
-             db "              YOU WIN!  .  . '  .   ,//////00000000|00HHHHHHHHMMMMMMM",13,10,0
-             db "     '      .              '   .    ///////0000000|00HHHHHHHMMMMMMMMM",13,10,0
-             db "   '              . '              ///////0000000|00HHHHHHHMMMMMMMMMM",13,10,0
-             db "                         .   '    ,///////0000000|0HHHHHHHHMMMMMMMMMM",13,10,0
-             db "       +         .       '   . '  ///////0000000|00HHHHHHHHMMMMMMMMMM",13,10,0
-             db "     '             '       .  '   ///////000000000HHHHHHHHMMMMMMMMMMM",13,10,0
-             db "                    +  .  . '    .///////000000000HHHHHHHHMMMMMMMMMMM",13,10,0
-             db "     '      .              '   . ///////000000000HHHHHHHHMMMMMMMMMMMM",13,10,0
-             db "   '                  . '        ///////000000000HHHHHHHHMMMMMMMMMMMM",13,10,0
-             db "                           .   ' ///////000000000HHHHHHHHMMMMMMMMMMMM",13,10,0
-             db "", 0             
-             db "", '$'                
+    winDesign db " YOU WIN! ",13,10, '$'              
    
     bullet db "*",13,10,'$'
 	explodedBullet db "#",13,10,'$'
     player db "^",13,10,'$'
     alien db "@",13,10,'$' 
     
-    LIMIT db "NO PUEDES HUIR! REGRESA A AL MISION",13,10,'$'
-    
 	; Game world dimensions
-    CEILING EQU 2 	
+    CEILING EQU 5 	
     FLOOR EQU 20
-    LEFT EQU 2
-    RIGHT EQU 40
+    LEFT_LIMIT EQU 15
+    RIGHT_LIMIT EQU 25
 	
 	RED EQU 4
 	LIGHT_GREEN EQU 10
@@ -73,11 +43,16 @@
 	
 	alienX db 20 
 	alienY db 5
-	
+	 
+	; messages and alerts
 	pointsMsg db "Puntaje: $"
 	bulletsMsg db "  Balas: $"
 	pointCount db 0
-	bulletCount db 5   
+	bulletCount db 5      
+	LIMIT db "NO PUEDES HUIR! REGRESA A AL MISION",13,10,'$'
+	collision_msg db "BOOM! Mataste un alien! ",13,10,'$'  
+	lost_bullet_msg db "BOOH! Perdiste una bala! ",13,10,'$'         
+	no_more_bullets_msg db "Ya no tienes balas! ",13,10,'$'  
 	 
 	; bullet information: posX, posY, exists, hasCollision
 	bulletPosX db 5 dup(0) 
@@ -85,12 +60,11 @@
 	bulletExists db 5 dup(0)
 	bulletCollision db 5 dup(0)  
     bulletIndex db 0 ; use as counter to access the bullet array
-	
+
 	alienPosX db 16, 17, 18, 19, 20, 21, 22, 23, 24
 	alienPosY db 5, 6, 7, 5, 6, 7, 5, 6, 7
 	alienExists db 9 dup(1)   
-	
-    slowAlien db 0  
+    alien_move_count db 2  
     
     alienDead db 0      
 	
@@ -142,11 +116,11 @@ check_for_keypressed:
         ; if bulletCount ==0 or bulletIndex == 5 jump to ret
         mov al, bulletCount
         cmp al, 0
-        je ret_from_set_bullet
+        je no_more_bullets
 
 		mov al, bulletIndex
 		cmp al, 5
-        jae ret_from_set_bullet
+        je ret_from_set_bullet
 		
 		; Set bullet X, Y if it doesn't exist      
 		mov bx, 0
@@ -171,71 +145,32 @@ check_for_keypressed:
 		; upadte the bullet counters for a new bullet
 		inc bulletIndex 
 		dec bulletCount
+		 
+		ret_from_set_bullet:			
+		ret    
 		
-		ret_from_set_bullet:
-	    ret    
+		no_more_bullets:
+		call show_no_bullets_message
+		ret
 	
 	move_player_left:
-		cmp playerX, 15
+		cmp playerX, LEFT_LIMIT
 		ja okl
-		push ax
-		push bx
-		push cx
-		push dx
 		
-		mov ah, 2h
-		mov dl, 07h
-		int 21h 
-		
-		mov AH, 2H
-        mov BH, 0            
-        mov DH, 0           
-        mov DL, 0           
-        INT 10H    
-		
-		mov ah, 9h
-		mov dx, offset LIMIT
-		int 21h 
-		
-		pop dx
-		pop cx
-		pop bx
-		pop ax
-		
+		call show_player_limit_message
 		add playerX, 1
+		
 		okl:
 		    dec playerX
 		    ret
 	
 	move_player_right:
-	    cmp playerX, 25
-		jb okr    
-		
-		push ax
-		push bx
-		push cx
-		push dx
-		
-		mov ah, 2h
-		mov dl, 07h
-		int 21h 
-		
-		mov AH, 2H
-        mov BH, 0            
-        mov DH, 0           
-        mov DL, 0           
-        INT 10H    
-		
-		mov ah, 9h
-		mov dx, offset LIMIT
-		int 21h 
-		
-		pop dx
-		pop cx
-		pop bx
-		pop ax
-		
+	    cmp playerX, RIGHT_LIMIT
+		jb okr  
+		 
+		call show_player_limit_message
 		sub playerX,1
+		
 		okr:
 		    inc playerX
 		    ret	
@@ -315,11 +250,9 @@ calc_bullet_position:
 				mov ch, 0
 				mov alienExists[bp], ch 
 				
-				dec bulletIndex 
-		        inc bulletCount  
-		        
 				inc pointCount
-				inc si
+				inc si  
+				call show_collision_message
 				jmp loop_bullets
 			     	 
 			; there wasn't any collision this bullet continues moving upwards			
@@ -332,9 +265,10 @@ calc_bullet_position:
 		    ; bullet gets to the ceiling
     		remove_bullet:
     			mov ah, 0
-    			mov bulletExists[si], ah	
-    		
-    			inc si
+    			mov bulletExists[si], ah
+				inc si				
+				call lost_bullet_message
+    			
     			jmp loop_bullets	
 				
 	exit_loop_bullets:
@@ -343,41 +277,43 @@ calc_bullet_position:
 calc_alienPosY:
 
 	mov si, 0  
+	
+	; make aliens move only every 2 frames
+	should_move_alien: 
+		cmp alien_move_count, 0 ; if alien_move_count != 0 don't move aliens
+		jne exit_loop_alien_dont_move  
 
-	loop_alienPosY:
-		cmp si, 9
-		je exit_loop_alien
+		loop_alienPosY:         ; else move them
+			cmp si, 9
+			je exit_loop_alien
+			
+			mov ah, alienExists[si]
+			cmp ah, 0
+			je continue_loop_alienPostY
+				 
+			mov al, alienPosY[si] 
+			inc al
+			mov alienPosY[si], al
+			
+			cmp al, playerY
+			je set_game_over ; break the loop if one alien is at player position 			
+			
+			continue_loop_alienPostY:
+			inc si 
+			jmp loop_alienPosY
+		 
+		set_game_over: 
+			inc gameOver      
 		
-		mov ah, alienExists[si]
-		cmp ah, 0
-		je continue_loop_alienPostY
-		     
-		mov al, alienPosY[si] 
-		cmp slowAlien, 2
-	    jne mantPosY
-		inc al
-		mantPosY:		    ;
-		mov alienPosY[si], al
+		exit_loop_alien: 
+			mov al, 2
+			mov alien_move_count, al ; reset move count
+			ret	
 		
-		cmp al, 20
-		je set_game_over ; break the loop if one alien is at player position 			
+		exit_loop_alien_dont_move:
+			dec alien_move_count
+			ret
 		
-		continue_loop_alienPostY:
-		inc si 
-		jmp loop_alienPosY
-	 
-	set_game_over: 
-	    inc gameOver      
-	
-	exit_loop_alien: 
-	    cmp slowAlien,2
-	    je  allowMoveAlien
-	    inc slowAlien
-	    ret	     
-	
-	allowMoveAlien:    
-        mov slowAlien, 0 
-        ret
 
 ; PAINT THE ACTUAL GAME				
 paint_game:   
@@ -428,7 +364,7 @@ paint_game:
 			
 			mov ch, alienExists[si]
 			cmp ch, 0
-			je alien_is_dead
+			je continue_painting_aliens
 			
 			mov ah,13h   
 			mov bp,offset alien 
@@ -442,13 +378,6 @@ paint_game:
 			continue_painting_aliens:
 			inc si
 			jmp loop_paint_alien 
-			
-			alien_is_dead:
-			inc si
-			inc alienDead
-			cmp alienDead, 9
-			je win_game
-			jmp loop_paint_alien
 		
 		exit_loop_paint_alien: 
 		cmp gameOver, 0
@@ -563,7 +492,109 @@ show_messages:
     
 	ret
 
+show_player_limit_message:     
+    push ax
+    push bx
+	push cx
+    push dx
+	
+	mov ah, 2h ; ping
+	mov dl, 07h
+	int 21h
+	
+    mov ah, 2h  ; set cursor position
+    mov bh, 0            
+    mov dh, 0           
+    mov dl, 0           
+    int 10h    
+    
+    mov ah, 9h
+	mov dx, offset LIMIT
+	int 21h
+    
+    pop ax
+    pop bx
+	pop cx
+    pop dx
+    ret
+         
+show_collision_message:     
+    push ax
+    push bx
+	push cx
+    push dx
+	
+	mov ah, 2h ; ping
+	mov dl, 07h
+	int 21h
+	
+    mov ah, 2h  ; set cursor position
+    mov bh, 0            
+    mov dh, 0           
+    mov dl, 2           
+    int 10h    
+    
+    mov ah, 9h
+	mov dx, offset collision_msg
+	int 21h
+    
+    pop ax
+    pop bx
+	pop cx
+    pop dx
+    ret   
+    
+lost_bullet_message:     
+    push ax
+    push bx
+	push cx
+    push dx
+	
+	mov ah, 2h ; ping
+	mov dl, 07h
+	int 21h
+	
+    mov ah, 2h  ; set cursor position
+    mov bh, 0            
+    mov dh, 0           
+    mov dl, 4           
+    int 10h    
+    
+    mov ah, 9h
+	mov dx, offset lost_bullet_msg
+	int 21h
+    
+    pop ax
+    pop bx
+	pop cx
+    pop dx
+    ret
 
+show_no_bullets_message:
+    push ax
+    push bx
+	push cx
+    push dx
+	
+	mov ah, 2h ; ping
+	mov dl, 07h
+	int 21h
+	
+    mov ah, 2h  ; set cursor position
+    mov bh, 0            
+    mov dh, 0           
+    mov dl, 6           
+    int 10h    
+    
+    mov ah, 9h
+	mov dx, offset no_more_bullets_msg
+	int 21h
+    
+    pop ax
+    pop bx
+	pop cx
+    pop dx
+    ret
 	
 clean_screen: 
 	mov ah, 6h 
